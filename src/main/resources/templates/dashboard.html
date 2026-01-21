@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <head>
+    <title>Dashboard • Expense Tracker</title>
+
+    <!-- CSRF for JS (needed for DELETE) -->
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+ 
+    
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #fbc2eb, #a6c1ee);
+        }
+        .navbar {
+            background: #ff5fa2;
+            color: white;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .container { padding: 30px; }
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            text-align: center;
+        }
+        .actions a, button {
+            background: #ff5fa2;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            margin: 5px;
+        }
+        table {
+            width: 100%;
+            background: white;
+            border-radius: 10px;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+        th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: center; }
+        .form-box { margin-top: 30px; }
+        input { padding: 8px; margin: 5px; }
+    </style>
+</head>
+
+<body>
+<div class="navbar">
+    <h2>💖 Expense Tracker</h2>
+    <form th:action="@{/logout}" method="post" style="display:inline;">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+    <button type="submit">Logout</button>
+</form>
+
+    
+</div>
+
+<div class="container">
+    <h1>Welcome to your Dashboard ✨</h1>
+
+    <div class="cards">
+    <div class="card">
+        <h3>Total Income</h3>
+        <p>₹ <span id="income" th:text="${income}">0</span></p>
+        
+    </div>
+    <div class="card">
+        <h3>Total Expense</h3>
+         <p>₹ <span id="expense" th:text="${expense}">0</span></p>
+    </div>
+    <div class="card">
+        <h3>Balance</h3>
+        <p>₹ <span id="balance" th:text="${balance}">0</span></p>
+    </div>
+</div>
+<hr>
+
+<form action="/add-income" method="post">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+    <input type="number" name="amount" placeholder="Enter Income" required>
+    <button type="submit">Save Income</button>
+</form>
+
+<h3>Add Expense</h3>
+<form action="/add-expense" method="post">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+     
+    <input type="text" name="title" placeholder="Title (e.g. Lunch, Taxi)" required>
+    <input type="text" name="category" placeholder="Category (Food, Travel...)" required>
+    <input type="number" name="amount" placeholder="Amount" required>
+    <input type="date"  name="expenseDate" placeholder="ExpenseDate" required>
+    <button type="submit">Add Expense</button>
+</form>
+
+
+
+<br>
+
+
+
+    <div class="actions">
+        
+        <a href="#" onclick="toggleTable()">📄 View Expenses</a>
+    </div>
+
+   
+
+    <!-- Table -->
+    <div id="expenseSection" style="display:none;">
+        <table>
+            <thead>
+                <tr><th>Title</th><th>Amount</th><th>Category</th><th>Date</th><th>Action</th></tr>
+            </thead>
+            <tbody id="expenseTable"></tbody>
+        </table>
+    </div>
+
+    <!-- Chart -->
+    <canvas id="expenseChart" style="max-width:500px;margin-top:40px;"></canvas>
+</div>
+
+
+<script>
+let chart;
+
+// Get CSRF token
+const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+function toggleTable(){
+    expenseSection.style.display = expenseSection.style.display === "none" ? "block" : "none";
+    loadExpenses();
+}
+
+function loadExpenses(){
+    fetch('/api/expenses')
+        .then(r=>r.json())
+        .then(data=>{
+            expenseTable.innerHTML="";
+            data.forEach(e=>{
+                expenseTable.innerHTML += `
+                  <tr>
+                    <td>${e.title}</td>
+                    <td>₹ ${e.amount}</td>
+                    <td>${e.category}</td>
+                    <td>${e.expenseDate}</td>
+                    <td><button onclick="deleteExpense(${e.id})">❌</button></td>
+                  </tr>`;
+            });
+            updateTotals(data);
+            drawChart(data);
+        });
+}
+
+function deleteExpense(id){
+    fetch('/api/expenses/' + id, {
+        method: 'DELETE',
+        headers: {
+            [csrfHeader]: csrfToken
+        }
+    }).then(res => {
+        if(res.ok){
+            loadExpenses();
+        } else {
+            alert("Delete failed!");
+        }
+    });
+}
+
+function updateTotals(data){
+    let totalExpense = 0;
+    data.forEach(e=>{
+        totalExpense += e.amount;
+    });
+
+    const totalIncome = parseFloat(document.getElementById("income").textContent.replace("₹","")) || 0;
+
+    document.getElementById("expense").textContent = totalExpense.toFixed(2);
+    document.getElementById("balance").textContent = (totalIncome - totalExpense).toFixed(2);
+}
+
+function drawChart(data){
+    const map = {};
+    data.forEach(e=>{
+        map[e.category]=(map[e.category]||0)+Math.abs(e.amount);
+    });
+    if(chart) chart.destroy();
+    chart = new Chart(expenseChart,{
+        type:'pie',
+        data:{labels:Object.keys(map),datasets:[{data:Object.values(map)}]}
+    });
+}
+</script>
+
+</body>
+</html>

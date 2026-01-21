@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>View Expenses</title>
+</head>
+<body>
+<h2>All Expenses</h2>
+
+<table border="1">
+    <tr>
+        <th>ID</th>
+        <th>Category</th>
+        <th>Amount</th>
+        <th>Date</th>
+    </tr>
+    <tr th:each="e : ${expenses}">
+        <td th:text="${e.id}"></td>
+        <td th:text="${e.category}"></td>
+        <td th:text="${e.amount}"></td>
+        <td th:text="${e.expenseDate}"></td>
+    </tr>
+</table>
+
+<br>
+<a href="/dashboard">⬅ Back to Dashboard</a>
+</body>
+</html>
